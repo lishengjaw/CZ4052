@@ -1,0 +1,42 @@
+{
+  "name": "CZ4052",
+  "version": "1.0.0",
+  "description": "",
+  "main": "script.js",
+  "scripts": {
+    "start": "webpack",
+    "build": "webpack"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lishengjaw/CZ4052.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/lishengjaw/CZ4052/issues"
+  },
+  "homepage": "https://github.com/lishengjaw/CZ4052#readme",
+  "dependencies": {
+    "assert": "^2.0.0",
+    "browserify-zlib": "^0.2.0",
+    "buffer": "^6.0.3",
+    "dotenv": "^16.0.3",
+    "fs": "^0.0.1-security",
+    "https-browserify": "^1.0.0",
+    "openai": "^3.1.0",
+    "os-browserify": "^0.3.0",
+    "path-browserify": "^1.0.1",
+    "process": "^0.11.10",
+    "stream-browserify": "^3.0.0",
+    "stream-http": "^3.2.0",
+    "uninstall": "^0.0.0",
+    "url": "^0.11.0"
+  },
+  "devDependencies": {
+    "web": "^0.0.2",
+    "webpack": "^5.75.0",
+    "webpack-cli": "^5.0.1"
+  }
+}
