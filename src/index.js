@@ -1,5 +1,5 @@
-require("dotenv").config();
-const { Configuration, OpenAIApi } = require("openai");
+import dotenv from 'dotenv';
+dotenv.config();
 
 const validHostNames = {
   "www.youtube.com": "YOUTUBE",
@@ -23,14 +23,6 @@ async function getTabId() {
 async function checkValidHostName(url) {
   let urlObj = await getUrlObj();
   return urlObj.hostname in validHostNames;
-}
-
-function getYoutubeVideoId(url) {
-  const regExp = new RegExp(
-    ".*(?:(?:youtu.be/|v/|vi/|u/w/|embed/)|(?:(?:watch)??v(?:i)?=|&v(?:i)?=))([^#&?]*).*",
-    "gi"
-  );
-  return regExp.exec(url)[1];
 }
 
 async function getTranscript(type, tabId) {
@@ -124,22 +116,40 @@ function scrapeYoutubeTitle() {
 }
 
 async function getSummaryFromOpenAI(title, transcript) {
-  const configuration = new Configuration({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
-  const openai = new OpenAIApi(configuration);
-  const response = await openai.createCompletion({
+  const params = {
     model: "text-davinci-003",
-    prompt: `Imagine you are 
-    I need you to help me summarize a transcript from a YouTube video.
-    The title of the video is ${title} and
-    the transcript is ${transcript}
-  `,
-    maxTokens: 100,
-  });
+    prompt: `We introduce Extreme TLDR generation, a new form of extreme
+    summarization given a YouTube video title and transcript. TLDR generation involves 
+    high source compression, removes stop words and summarizes the transcript whilst 
+    retaining meaning. The result is the shortest possible summary that retains 
+    all of the original meaning and context of the transcript.
+    
+    Title:
+    ${title}
 
-  if (response.status === 200) {
-    return response.data.choices[0].text;
+    Transcript:
+    ${transcript}
+    
+    Extreme TLDR:
+    `,
+    max_tokens: 100,
+  };
+  const requestOptions = {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify(params),
+  };
+  const response = await fetch(
+    "https://api.openai.com/v1/completions",
+    requestOptions
+  );
+
+  if (response.ok) {
+    const data = await response.json();
+    return data.choices[0].text;
   } else {
     return "Error occurred, please try again";
   }

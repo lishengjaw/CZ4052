@@ -1,5 +1,6 @@
 const path = require("path");
 const webpack = require("webpack");
+const DotenvWebpackPlugin = require("dotenv-webpack");
 
 module.exports = {
   mode: "development",
@@ -26,6 +27,9 @@ module.exports = {
   plugins: [
     new webpack.ProvidePlugin({
       process: "process/browser",
+    }),
+    new DotenvWebpackPlugin({
+      path: "./.env",
     }),
   ],
 };
