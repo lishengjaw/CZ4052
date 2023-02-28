@@ -1071,6 +1071,7 @@ async function getYoutubeTranscript(tabId) {
     target: { tabId: tabId },
     function: filterTranscript,
   });
+
   return filteredTranscript[0].result;
 }
 
@@ -1135,23 +1136,27 @@ function scrapeYoutubeTitle() {
 }
 
 async function getSummaryFromOpenAI(title, transcript) {
+  const max_tokens = 256;
   const params = {
     model: "text-davinci-003",
     prompt: `We introduce Extreme TLDR generation, a new form of extreme
     summarization given a YouTube video title and transcript. TLDR generation involves 
     high source compression, removes stop words and summarizes the transcript whilst 
-    retaining meaning. The result is the shortest possible summary that retains 
-    all of the original meaning and context of the transcript.
+    retaining meaning. The result is the shortest possible summary in ${max_tokens} or less tokens
+    that retains all of the original meaning and context of the transcript.
     
+    Example:
+
     Title:
     ${title}
 
     Transcript:
     ${transcript}
     
-    Extreme TLDR:
+    Enter the Extreme TLDR of the video transcript here:
+
     `,
-    max_tokens: 100,
+    max_tokens: max_tokens,
   };
   const requestOptions = {
     method: "POST",
@@ -1180,8 +1185,6 @@ document
     document.getElementById("get-summary-btn").disabled = true;
 
     const url = await getUrl();
-    document.getElementById("url").innerHTML = `Url: ${url}`;
-
     const validHostName = await checkValidHostName(url);
     if (!validHostName) {
       document.getElementById("summary").innerHTML =
@@ -1191,7 +1194,10 @@ document
       const urlObj = await getUrlObj();
       const type = validHostNames[urlObj.hostname];
       const tabId = await getTabId();
-      const transcript = await getTranscript(type, tabId);
+      let transcript = "";
+      while (transcript === "") {
+        transcript = await getTranscript(type, tabId);
+      }
       const title = await getTitle(type, tabId);
       const summary = await getSummaryFromOpenAI(title, transcript);
       document.getElementById("summary").innerHTML = summary;
