@@ -8,9 +8,14 @@ export default function App() {
     "Long (> 20 minutes)",
   ];
 
+  const summaryLanguages = ["English", "Simplified Chinese"];
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedVideoDuration, setSelectedVideoDuration] = useState(
     videoDurations[0]
+  );
+  const [selectedSummaryLanguage, setSelectedSummaryLanguage] = useState(
+    summaryLanguages[0]
   );
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -19,13 +24,15 @@ export default function App() {
     e.preventDefault();
 
     const payload = Object.fromEntries(new FormData(e.target).entries());
-    if (payload.searchTerm === "") {
+    if (!payload.searchTerm) {
       return alert("Please enter a search term");
     }
     payload.videoDuration = mapVideoDuration(payload.videoDuration);
 
     setLoading(true);
     setSearchResults([]);
+    const searchButton = document.querySelector("button[type=submit]");
+    searchButton.disabled = true;
     try {
       const response = await fetch("http://localhost:3001/search", {
         method: "POST",
@@ -40,6 +47,7 @@ export default function App() {
       alert(err);
     }
     setLoading(false);
+    searchButton.disabled = false;
   }
 
   function mapVideoDuration(duration) {
@@ -64,6 +72,23 @@ export default function App() {
     });
   }
 
+  function highlightKeywordsFromSummary(summary, keywords) {
+    let highlightedSummary = summary;
+    for (const keyword of keywords) {
+      const regExp = new RegExp(`[\\p{L}\\p{Han}]*${keyword}[\\p{L}\\p{Han}]*`, "gi");
+      const matches = highlightedSummary.match(regExp);
+      if (matches) {
+        for (const match of matches) {
+          highlightedSummary = highlightedSummary.replace(
+            match,
+            `<span class="highlight">${match}</span>`
+          );
+        }
+      }
+    }
+    return highlightedSummary;
+  }
+
   return (
     <div className="app">
       <div className="search-bar-container">
@@ -80,23 +105,40 @@ export default function App() {
             <button type="submit">Search</button>
           </div>
           <div className="search-filters">
-            {videoDurations.map((duration, index) => (
-              <div className="search-filter" key={index}>
-                <input
-                  type="radio"
-                  id={duration}
-                  name="videoDuration"
-                  value={duration}
-                  checked={selectedVideoDuration === duration}
-                  onChange={(e) => setSelectedVideoDuration(e.target.value)}
-                />
-                <label>{duration}</label>
-              </div>
-            ))}
+            <div className="search-filter-group">
+              {videoDurations.map((duration, index) => (
+                <div className="search-filter" key={index}>
+                  <input
+                    type="radio"
+                    id={duration}
+                    name="videoDuration"
+                    value={duration}
+                    checked={selectedVideoDuration === duration}
+                    onChange={(e) => setSelectedVideoDuration(e.target.value)}
+                  />
+                  <label>{duration}</label>
+                </div>
+              ))}
+            </div>
+            <div className="search-filter-group">
+              {summaryLanguages.map((language, index) => (
+                <div className="search-filter" key={index}>
+                  <input
+                    type="radio"
+                    id={language}
+                    name="summaryLanguage"
+                    value={language}
+                    checked={selectedSummaryLanguage === language}
+                    onChange={(e) => setSelectedSummaryLanguage(e.target.value)}
+                  />
+                  <label>{language}</label>
+                </div>
+              ))}
+            </div>
           </div>
         </form>
       </div>
-      {searchResults.length > 0 ? (
+      {searchResults.length ? (
         <div className="search-results-container">
           <h2>Search Results ({searchResults.length})</h2>
           <div className="search-results">
@@ -104,6 +146,7 @@ export default function App() {
               ({
                 channelName,
                 channelThumbnail,
+                keywords,
                 link,
                 publishedAt,
                 videoId,
@@ -137,7 +180,14 @@ export default function App() {
                   </div>
                   <div className="search-result-bottom">
                     <div className="search-result-summary">
-                      <p>Summary: {summary || "No summary found"}</p>
+                      <p
+                        dangerouslySetInnerHTML={{
+                          __html: summary
+                            ? "Summary: " +
+                              highlightKeywordsFromSummary(summary, keywords)
+                            : "No summary found",
+                        }}
+                      />
                     </div>
                   </div>
                 </div>

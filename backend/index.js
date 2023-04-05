@@ -10,20 +10,29 @@ app.use(cors());
 const videoDurationMapping = {
   short: {
     maxResults: 5,
-    maxSummaryLength: 200,
+    maxSummaryLength: {
+      "English": 200,
+      "Simplified Chinese": 600,
+    }
   },
   medium: {
     maxResults: 5,
-    maxSummaryLength: 300,
+    maxSummaryLength: {
+      "English": 300,
+      "Simplified Chinese": 900,
+    },
   },
   long: {
     maxResults: 3,
-    maxSummaryLength: 500,
+    maxSummaryLength: {
+      "English": 500,
+      "Simplified Chinese": 1500,
+    }
   },
 };
 
 app.post("/search", async (req, res) => {
-  const { searchTerm, videoDuration } = req.body;
+  const { searchTerm, videoDuration, summaryLanguage } = req.body;
   let searchResults = [];
   try {
     const data = await getYoutubeData(searchTerm, videoDuration);
@@ -66,13 +75,18 @@ app.post("/search", async (req, res) => {
     await driver.quit();
 
     for (let i = 0; i < searchResults.length; i++) {
-      const { transcript } = searchResults[i];
-      const { maxSummaryLength } = videoDurationMapping[videoDuration];
+      const { transcript, title } = searchResults[i];
+      const maxSummaryLength = videoDurationMapping[videoDuration].maxSummaryLength[summaryLanguage];
       try {
-        searchResults[i].summary = await getSummaryFromTranscript(
+        const { summary, keywords } = await getSummaryAndKeywordsFromTranscript(
           transcript,
-          maxSummaryLength
+          maxSummaryLength,
+          summaryLanguage,
+          searchTerm,
+          title
         );
+        searchResults[i].summary = summary;
+        searchResults[i].keywords = keywords;
         delete searchResults[i].transcript;
       } catch (err) {}
     }
@@ -84,15 +98,7 @@ app.post("/search", async (req, res) => {
 });
 
 async function getYoutubeData(searchTerm, videoDuration) {
-  const url = `${process.env.YOUTUBE_DATA_API_URL}?
-  key=${process.env.YOUTUBE_DATA_API_KEY}
-  &part=snippet&q=${searchTerm}
-  &videoDuration=${videoDuration}
-  &type=video
-  &order=viewCount
-  &relevantLanguage=en
-  &videoCaption=closedCaption
-  &maxResults=${videoDurationMapping[videoDuration].maxResults}`;
+  const url = `${process.env.YOUTUBE_DATA_API_URL}?key=${process.env.YOUTUBE_DATA_API_KEY}&part=snippet&q=${searchTerm}&videoDuration=${videoDuration}&type=video&relevanceLanguage=en&maxResults=${videoDurationMapping[videoDuration].maxResults}`;
   const response = await fetch(url);
 
   if (response.ok) {
@@ -190,9 +196,18 @@ function filterTranscript(transcript) {
   return filteredTranscript.join(" ");
 }
 
-async function getSummaryFromTranscript(transcript, maxTokens) {
-  if (transcript === "") {
-    return "";
+async function getSummaryAndKeywordsFromTranscript(
+  transcript,
+  maxTokens,
+  summaryLanguage,
+  searchTerm,
+  title
+) {
+  if (!transcript) {
+    return {
+      summary: transcript,
+      keywords: [],
+    };
   }
   const response = await fetch(process.env.OPENAI_API_URL, {
     method: "POST",
@@ -205,10 +220,16 @@ async function getSummaryFromTranscript(transcript, maxTokens) {
       prompt: `We introduce Extreme TLDR Generation, a new form of extreme
         summarization given a YouTube video transcript. TLDR Generation involves 
         high source compression, removes stop words and summarizes the transcript whilst 
-        retaining meaning. The result is the shortest possible summary in ${maxTokens} or less tokens.
-            
-        Provide the extreme TLDR of the following video transcript: ${transcript}
-        TLDR:`,
+        retaining meaning.
+        
+        The video is about ${searchTerm} and is titled ${title}.
+        
+        Provide the extreme TLDR of the following video transcript in only ${summaryLanguage} with the label "TLDR:": ${transcript}.
+        
+        Also provide a list of keywords only from the TLDR above with the label "Keywords:".
+
+        The TLDR and list of keywords must be in ${maxTokens} or less tokens.
+        `,
       temperature: 0.7,
       max_tokens: maxTokens,
     }),
@@ -216,7 +237,15 @@ async function getSummaryFromTranscript(transcript, maxTokens) {
 
   if (response.ok) {
     const data = await response.json();
-    return data.choices[0].text;
+    const match = new RegExp("TLDR: (.*)Keywords: (.*).?", "g").exec(
+      data.choices[0].text.replace(new RegExp("\n", "g"), " ")
+    );
+    const split_keywords = match[2].trim().split(new RegExp("[，,]", "g"));
+    const trim_keywords = split_keywords.map((keyword) => keyword.trim());
+    return {
+      summary: match[1].trim(),
+      keywords: trim_keywords,
+    };
   } else {
     throw new Error("Error getting summary from OpenAI");
   }
